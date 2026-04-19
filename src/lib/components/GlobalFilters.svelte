@@ -6,27 +6,35 @@
 
   export let allRows: Indexer[] = [];
 
-  // Build language options dynamically from all rows
+  const languageNames: Record<string, string> = {
+    EN: 'English',
+    DE: 'German',
+    ES: 'Spanish',
+    FR: 'French',
+    NL: 'Dutch',
+    TR: 'Turkish',
+    VI: 'Vietnamese',
+    AR: 'Arabic',
+  };
+
+  // Build language options dynamically from all rows (2-letter language codes only).
   function langsFromContent(content?: string): string[] {
     if (!content) return [];
 
-    // Remove blacklisted tokens (case-insensitive, whole-word)
-    const blacklist = ['be', 'no', 'No', 'to'];
-    const escaped = blacklist.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    const removeRe = new RegExp(`\\b(?:${escaped.join('|')})\\b`, 'gi');
-    const sanitized = content.replace(removeRe, ' ');
+    const blacklist = new Set(['NO', 'TO', 'BE', 'TV', 'HD', 'XX', 'OR', 'IT', 'ON']);
+    const codes = content.toUpperCase().match(/\b[A-Z]{2}\b/g) ?? [];
+    return Array.from(new Set(codes.filter((code) => !blacklist.has(code))));
+  }
 
-    // Extract remaining two-letter codes
-    const codes = sanitized.toUpperCase().match(/\b[A-Z]{2}\b/g) ?? [];
-    codes.push('Anime');
-    codes.push('Music');
-    codes.push('Encodes');
-    return Array.from(new Set(codes));
+  function languageLabel(code: string): string {
+    const normalized = code.toUpperCase();
+    const name = languageNames[normalized];
+    return name ? `${name} (${normalized})` : normalized;
   }
 
   $: languageOptions = Array.from(new Set(allRows.flatMap((r) => langsFromContent(r.content))))
     .filter(Boolean)
-    .sort((a, b) => a.length - b.length || a.localeCompare(b));
+    .sort((a, b) => languageLabel(a).localeCompare(languageLabel(b)));
 
   // Subscribe reactively to the store (Svelte auto-subscription)
   let f: FiltersState;
@@ -34,8 +42,8 @@
 
   // Count active filters
   $: activeCount =
-    (f.minApi != null ? 1 : 0) +
-    (f.minNzb != null ? 1 : 0) +
+    (f.apiMode !== 'any' ? 1 : 0) +
+    (f.nzbMode !== 'any' ? 1 : 0) +
     (f.language !== 'any' ? 1 : 0) +
     (f.lifetimeOnly ? 1 : 0) +
     (f.freeOnly ? 1 : 0) +
@@ -62,42 +70,70 @@
 
   <div class="collapse-content">
     <div class="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-      <!-- Min API -->
+      <!-- API/Day -->
       <label class="form-control w-full">
         <div class="label">
-          <span class="label-text">{strings[$langStore].filters.minApi}</span>
+          <span class="label-text">{strings[$langStore].filters.apiPerDay}</span>
         </div>
-        <input
-          type="number"
-          class="input input-bordered w-full"
-          inputmode="numeric"
-          min="0"
-          placeholder="1000"
-          on:input={(e) => {
-            const v = (e.currentTarget as HTMLInputElement).value;
-            filters.update((x) => ({ ...x, minApi: toNumOrNull(v) }));
+        <select
+          class="select select-bordered w-full"
+          value={f.apiMode}
+          on:change={(e) => {
+            const v = (e.currentTarget as HTMLSelectElement).value as FiltersState['apiMode'];
+            filters.update((x) => ({ ...x, apiMode: v, minApi: v === 'min' ? (x.minApi ?? 0) : x.minApi }));
           }}
-          value={f.minApi ?? ''}
-        />
+        >
+          <option value="any">{strings[$langStore].filters.any}</option>
+          <option value="min">{strings[$langStore].filters.minApi}</option>
+          <option value="unlimited">{strings[$langStore].labels.unlimited}</option>
+        </select>
+        {#if f.apiMode === 'min'}
+          <input
+            type="number"
+            class="input input-bordered mt-2 w-full"
+            inputmode="numeric"
+            min="0"
+            placeholder="1000"
+            on:input={(e) => {
+              const v = (e.currentTarget as HTMLInputElement).value;
+              filters.update((x) => ({ ...x, minApi: toNumOrNull(v) }));
+            }}
+            value={f.minApi ?? ''}
+          />
+        {/if}
       </label>
 
-      <!-- Min NZB -->
+      <!-- NZB/Day -->
       <label class="form-control w-full">
         <div class="label">
-          <span class="label-text">{strings[$langStore].filters.minNzb}</span>
+          <span class="label-text">{strings[$langStore].filters.nzbPerDay}</span>
         </div>
-        <input
-          type="number"
-          class="input input-bordered w-full"
-          inputmode="numeric"
-          min="0"
-          placeholder="100"
-          on:input={(e) => {
-            const v = (e.currentTarget as HTMLInputElement).value;
-            filters.update((x) => ({ ...x, minNzb: toNumOrNull(v) }));
+        <select
+          class="select select-bordered w-full"
+          value={f.nzbMode}
+          on:change={(e) => {
+            const v = (e.currentTarget as HTMLSelectElement).value as FiltersState['nzbMode'];
+            filters.update((x) => ({ ...x, nzbMode: v, minNzb: v === 'min' ? (x.minNzb ?? 0) : x.minNzb }));
           }}
-          value={f.minNzb ?? ''}
-        />
+        >
+          <option value="any">{strings[$langStore].filters.any}</option>
+          <option value="min">{strings[$langStore].filters.minNzb}</option>
+          <option value="unlimited">{strings[$langStore].labels.unlimited}</option>
+        </select>
+        {#if f.nzbMode === 'min'}
+          <input
+            type="number"
+            class="input input-bordered mt-2 w-full"
+            inputmode="numeric"
+            min="0"
+            placeholder="100"
+            on:input={(e) => {
+              const v = (e.currentTarget as HTMLInputElement).value;
+              filters.update((x) => ({ ...x, minNzb: toNumOrNull(v) }));
+            }}
+            value={f.minNzb ?? ''}
+          />
+        {/if}
       </label>
 
       <!-- Language -->
@@ -107,7 +143,7 @@
         </div>
         <select
           class="select select-bordered w-full"
-          bind:value={f.language}
+          value={f.language}
           on:change={(e) => {
             const v = (e.currentTarget as HTMLSelectElement).value;
             filters.update((x) => ({ ...x, language: v }));
@@ -115,7 +151,7 @@
         >
           <option value="any">{strings[$langStore].filters.any}</option>
           {#each languageOptions as code}
-            <option value={code}>{code}</option>
+            <option value={code}>{languageLabel(code)}</option>
           {/each}
         </select>
       </label>

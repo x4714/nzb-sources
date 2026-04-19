@@ -64,7 +64,9 @@ export const strings = {
     },
     filters: {
       title: 'Filters',
+      apiPerDay: 'API Requests/Day',
       minApi: 'Min API/Day',
+      nzbPerDay: 'NZB/Day',
       minNzb: 'Min NZB/Day',
       language: 'Content focused on',
       any: 'Any',
@@ -179,7 +181,9 @@ export const strings = {
     },
     filters: {
       title: 'Filter',
+      apiPerDay: 'API-Anfragen/Tag',
       minApi: 'Min. API/Tag',
+      nzbPerDay: 'NZB/Tag',
       minNzb: 'Min. NZB/Tag',
       language: 'Focus auf Inhalt',
       any: 'Alle',

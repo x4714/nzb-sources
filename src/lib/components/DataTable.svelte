@@ -79,9 +79,25 @@
     return asNumberLike(m.nzbPerDay);
   }
 
+  function isUnlimitedLimit(v?: number | string | null): boolean {
+    return String(v ?? '').trim().toLowerCase() === 'unlimited';
+  }
+
+  function isUnlimitedApi(m: Membership): boolean {
+    return m.apiKey === 'unlimited' || isUnlimitedLimit(m.apiPerDay);
+  }
+
+  function isUnlimitedNzb(m: Membership): boolean {
+    return isUnlimitedLimit(m.nzbPerDay);
+  }
+
   function membershipMatches(m: Membership, filters: FiltersState): boolean {
-    if (filters.minApi != null && asApiNumber(m) < filters.minApi) return false;
-    if (filters.minNzb != null && asNzbNumber(m) < filters.minNzb) return false;
+    if (filters.apiMode === 'unlimited' && !isUnlimitedApi(m)) return false;
+    if (filters.apiMode === 'min' && asApiNumber(m) < (filters.minApi ?? 0)) return false;
+
+    if (filters.nzbMode === 'unlimited' && !isUnlimitedNzb(m)) return false;
+    if (filters.nzbMode === 'min' && asNzbNumber(m) < (filters.minNzb ?? 0)) return false;
+
     if (filters.lifetimeOnly) {
       const d = (m.duration ?? '').toLowerCase();
       if (!d.includes('lifetime') && !d.includes('lebenslang')) return false;
@@ -97,11 +113,22 @@
 
   function indexerMatches(r: Indexer, filters: FiltersState): boolean {
     if (filters.language !== 'any') {
-      if (!(r.content || '').includes(filters.language)) return false;
+      const content = (r.content || '').toUpperCase();
+      const token = filters.language.toUpperCase();
+      const regex = new RegExp(`\\b${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (!regex.test(content)) return false;
     }
     if (filters.supportsCrypto) {
-      const s = (r.crypto?.join(',') ?? '').replace(/[^a-z0-9]/gi, '').toLowerCase();
-      if (!s || s === '-' || s === '?') return false;
+      const rawCrypto = (r.crypto?.join(' ') ?? '').toLowerCase();
+      const rawPayments = (r.payments?.join(' ') ?? '').toLowerCase();
+      const hasCryptoField =
+        !!rawCrypto &&
+        !/^\s*[-?]\s*$/.test(rawCrypto) &&
+        !/\bnone\b|\bno crypto\b|\bno\b/.test(rawCrypto);
+      const hasCryptoPaymentHint = /\bcoin|crypto|btc|xmr|eth|ltc|doge|dash|bch|zec|sol|usdt\b/.test(
+        rawPayments
+      );
+      if (!hasCryptoField && !hasCryptoPaymentHint) return false;
     }
     return true;
   }
