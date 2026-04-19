@@ -17,16 +17,27 @@
     AR: 'Arabic',
   };
 
-  // Build language options dynamically from all rows (2-letter language codes only).
+  const legacyFocuses = ['Anime', 'Music', 'Encodes'];
+
+  // Build language options dynamically from all rows while keeping legacy focus options.
   function langsFromContent(content?: string): string[] {
-    if (!content) return [];
+    const hits: string[] = [];
+    if (!content) return [...legacyFocuses];
 
     const blacklist = new Set(['NO', 'TO', 'BE', 'TV', 'HD', 'XX', 'OR', 'IT', 'ON']);
     const codes = content.toUpperCase().match(/\b[A-Z]{2}\b/g) ?? [];
-    return Array.from(new Set(codes.filter((code) => !blacklist.has(code))));
+    hits.push(...codes.filter((code) => !blacklist.has(code)));
+
+    const lower = content.toLowerCase();
+    for (const focus of legacyFocuses) {
+      if (lower.includes(focus.toLowerCase())) hits.push(focus);
+    }
+
+    return Array.from(new Set(hits));
   }
 
   function languageLabel(code: string): string {
+    if (!/^[a-z]{2}$/i.test(code)) return code;
     const normalized = code.toUpperCase();
     const name = languageNames[normalized];
     return name ? `${name} (${normalized})` : normalized;
